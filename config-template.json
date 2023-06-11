@@ -1,0 +1,16 @@
+{
+    "providerUrl": "https://api.devnet.solana.com",
+    "bundlrAddress": "https://devnet.bundlr.network",
+    "nftTemplate": {
+        "name": "Balls NFT",
+        "symbol": "BALLZ",
+        "description": "Very ballsy NFT",
+        "imgUri": "./uploads/ball.png",
+        "attributes": [ { "trait_type": "roundness", "value": "super"} ]
+    },
+    "nftDistributions": [
+        {
+            "destPubkey": "ArVRjJrgRt4rPzaoNVWwNKw4hu7HeWb8arxGL7N5NygG"
+        }
+    ]
+}
