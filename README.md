@@ -1,5 +1,7 @@
 # Solana minting, airdrop and update
 
+[![build](../../workflows/build/badge.svg)](../../actions/workflows/build.yml)
+
 Provides command line to mint, airdrop and update image of solana nfts. Wallet secret/priv key needs to be supplied inside file `wallet-secret.txt`. Config should be based of [config-template.json](./config-template.json) and copied into `config.json`.
 
 Note: to appease node rate limiting, async operations are performed at batches of 10, with 5s sleep between batches. This is configurable within `config.json`'s `batchExec` setting.
