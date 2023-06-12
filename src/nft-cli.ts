@@ -2,15 +2,9 @@
 
 import * as cmdts from "cmd-ts";
 import { loadConfig, saveConfig } from "./config";
-import {
-  mintNfts,
-  airdropNfts,
-  updateNfts,
-  sleep,
-  executeBatch,
-  Result,
-} from "./lib";
+import { mintNfts, airdropNfts, updateNfts } from "./lib";
 import { Config, NftDistribution } from "./types";
+import { Result } from "./utils";
 
 const mint = cmdts.command({
   name: "mint",
