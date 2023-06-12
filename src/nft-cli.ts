@@ -42,34 +42,12 @@ const update = cmdts.command({
   },
 });
 
-const balls = cmdts.command({
-  name: "balls",
-  args: {},
-  handler: async () => {
-    async function doSomething(i: number): Promise<number> {
-      console.log(`${Date.now()}: balls ${i} started`);
-      await sleep(i * 100);
-      if (i % 5 == 0) throw new Error(`${Date.now()}: balls ${i} failed`);
-      else console.log(`${Date.now()}: balls ${i} succeeded`);
-      return i;
-    }
-
-    const res = await executeBatch(
-      [...Array(23).keys()].map((i) => () => doSomething(i)),
-      5,
-      5000
-    );
-    console.log(res);
-  },
-});
-
 const cmd = cmdts.subcommands({
   name: "cmd",
   cmds: {
     mint,
     airdrop,
     update,
-    balls,
   },
 });
 
