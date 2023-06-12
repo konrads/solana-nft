@@ -5,7 +5,7 @@ import { Config } from "./types";
 export function loadConfig(): Config {
   const config: Config = require(`../config.json`);
   config.walletSecret = fs.readFileSync("./wallet-secret.txt", "utf8");
-  //   validateConfigSchema(config);
+  validateConfigSchema(config);
   return config;
 }
 

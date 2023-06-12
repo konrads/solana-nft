@@ -1,6 +1,7 @@
 {
     "providerUrl": "https://api.devnet.solana.com",
     "bundlrAddress": "https://devnet.bundlr.network",
+    "batchExec": { "size": 10, "delayMs": 5000 },
     "nftTemplate": {
         "name": "Balls NFT",
         "symbol": "BALLZ",

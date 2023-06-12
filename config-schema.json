@@ -1,0 +1,65 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "type": "object",
+    "properties": {
+        "providerUrl": {
+            "type": "string"
+        },
+        "bundlrAddress": {
+            "type": "string"
+        },
+        "batchExec": {"$ref": "#/definitions/BatchExec"},
+        "nftTemplate": {"$ref": "#/definitions/NftTemplate"},
+        "nftDistributions": {
+            "type": "array",
+            "items": [{"$ref": "#/definitions/NftDistribution"}]
+        }
+    },
+    "required": [
+      "providerUrl",
+      "bundlrAddress",
+      "batchExec"
+    ],
+    "definitions": {
+        "BatchExec": {
+            "type": "object",
+            "properties": {
+              "size": {"type": "integer", "minimum": 1},
+              "delayMs": {"type": "integer", "minimum": 0}
+            },
+            "required": ["size", "delayMs"]
+        },
+        "NftTemplate": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "symbol": {"type": "string"},
+                "description": {"type": "string"},
+                "imgUri": {"type": "string"},
+                "attributes": {
+                    "type": "array",
+                    "items": [{"$ref": "#/definitions/NftTemplateAttribute"}]
+                  }
+            },
+            "required": ["name", "symbol", "description", "imgUri", "attributes"]
+        },
+        "NftTemplateAttribute": {
+            "type": "object",
+            "properties": {
+                "trait_type": {"type": "string"},
+                "value": {"type": "string"}
+            },
+            "required": ["trait_type", "value"]
+        },
+        "NftDistribution": {
+            "type": "object",
+            "properties": {
+                "destPubkey": {"type": "string"},
+                "nftMintPubkey": {"type": "string"},
+                "imgUri": {"type": "string"},
+                "status": {"type": "string", "enum": ["minted", "airdropped", "updated"]}
+            },
+            "required": ["destPubkey"]
+        }
+    }
+}

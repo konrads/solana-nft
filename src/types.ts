@@ -4,6 +4,7 @@ export interface Config {
   bundlrAddress: string;
   nftTemplate: NftTemplate;
   nftDistributions: NftDistribution[];
+  batchExec: { size: number; delayMs: number };
 }
 
 export interface NftTemplate {

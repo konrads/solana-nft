@@ -8,10 +8,16 @@ import {
   toBigNumber,
 } from "@metaplex-foundation/js";
 import bs58 from "bs58";
-import { getOrCreateAssociatedTokenAccount, transfer } from "@solana/spl-token";
-import { Config } from "./types";
+import {
+  getAssociatedTokenAddressSync,
+  getOrCreateAssociatedTokenAccount,
+  transfer,
+} from "@solana/spl-token";
+import { Config, NftDistribution } from "./types";
 
-export async function mintNfts(config: Config): Promise<Config> {
+export async function mintNfts(
+  config: Config
+): Promise<Result<NftDistribution>[]> {
   // if not yet hosted, upload image
   const solanaConn = new Connection(config.providerUrl);
   const wallet = toWallet(config.walletSecret);
@@ -40,7 +46,7 @@ export async function mintNfts(config: Config): Promise<Config> {
   console.log(`Uploaded NFT metadata ${metadata.uri}`);
 
   // serially mint nfts
-  for (var nftDistro of config.nftDistributions) {
+  const tasks = config.nftDistributions.map((nftDistro) => async () => {
     const { nft } = await metaplex.nfts().create(
       {
         uri: metadata.uri,
@@ -61,12 +67,24 @@ export async function mintNfts(config: Config): Promise<Config> {
         nftDistro.destPubkey
       }`
     );
-  }
 
-  return config;
+    return {
+      ...nftDistro,
+      nftMintPubkey: nft.mint.address.toString(),
+      status: "minted",
+    } as NftDistribution;
+  });
+
+  return await executeBatch(
+    tasks,
+    config.batchExec.size,
+    config.batchExec.delayMs
+  );
 }
 
-export async function airdropNfts(config: Config): Promise<Config> {
+export async function airdropNfts(
+  config: Config
+): Promise<Result<NftDistribution>[]> {
   const solanaConn = new Connection(config.providerUrl);
   const wallet = toWallet(config.walletSecret);
 
@@ -78,23 +96,41 @@ export async function airdropNfts(config: Config): Promise<Config> {
     throw new Error("Not all NFTs have been minted yet");
   }
 
-  for (const nftDistro of config.nftDistributions) {
+  const tasks = config.nftDistributions.map((nftDistro) => async () => {
     const fromTokenAccount = await getOrCreateAssociatedTokenAccount(
       solanaConn,
       wallet,
       new PublicKey(nftDistro.nftMintPubkey!),
-      wallet.publicKey,
+      new PublicKey(wallet.publicKey),
       false,
       "finalized"
     );
+    console.log(
+      `Fetched ATA ${fromTokenAccount.address.toString()} for mint ${nftDistro.nftMintPubkey?.toString()}`
+    );
 
-    const toTokenAccount = await getOrCreateAssociatedTokenAccount(
-      solanaConn,
-      wallet,
-      new PublicKey(nftDistro.nftMintPubkey!),
-      new PublicKey(nftDistro.destPubkey),
-      false,
-      "finalized"
+    async function createToATA() {
+      return await getOrCreateAssociatedTokenAccount(
+        solanaConn,
+        wallet,
+        new PublicKey(nftDistro.nftMintPubkey!),
+        new PublicKey(nftDistro.destPubkey),
+        true,
+        "finalized"
+      );
+    }
+
+    // Not sure why but retry often helps...
+    let toTokenAccount;
+    try {
+      toTokenAccount = await createToATA();
+    } catch (e) {
+      console.log("Retrying ATA creation...");
+      await sleep(10000);
+      toTokenAccount = await createToATA();
+    }
+    console.log(
+      `Created ATA ${toTokenAccount.address.toString()} for mint ${nftDistro.nftMintPubkey?.toString()}`
     );
 
     await transfer(
@@ -108,13 +144,19 @@ export async function airdropNfts(config: Config): Promise<Config> {
 
     console.log(`Airdropped NFT to ${nftDistro.destPubkey}!`);
 
-    nftDistro.status = "airdropped";
-  }
+    return { ...nftDistro, status: "airdropped" } as NftDistribution;
+  });
 
-  return config;
+  return await executeBatch(
+    tasks,
+    config.batchExec.size,
+    config.batchExec.delayMs
+  );
 }
 
-export async function updateNfts(config: Config): Promise<Config> {
+export async function updateNfts(
+  config: Config
+): Promise<Result<NftDistribution>[]> {
   const solanaConn = new Connection(config.providerUrl);
   const wallet = toWallet(config.walletSecret);
   const metaplex = toMetaplex(solanaConn, wallet, config.bundlrAddress);
@@ -127,12 +169,12 @@ export async function updateNfts(config: Config): Promise<Config> {
   );
   if (!canUpdate) {
     throw new Error(
-      "Not all NFTs have been airdropped yet, or update imgUri not specified"
+      `Not all NFTs have been airdropped yet, or update "imgUri" not yet added for update`
     );
   }
 
   // update serially
-  for (const nftDistro of config.nftDistributions) {
+  const tasks = config.nftDistributions.map((nftDistro) => async () => {
     const nft = await metaplex.nfts().findByMint({
       mintAddress: new PublicKey(nftDistro.nftMintPubkey!),
     });
@@ -170,13 +212,17 @@ export async function updateNfts(config: Config): Promise<Config> {
       { commitment: "finalized" }
     );
 
-    nftDistro.status = "updated";
     console.log(
       `Updated NFT metadata ${metadata.uri}, image ${metaplexImgUri}`
     );
-  }
+    return { ...nftDistro, status: "airdropped" } as NftDistribution;
+  });
 
-  return config;
+  return await executeBatch(
+    tasks,
+    config.batchExec.size,
+    config.batchExec.delayMs
+  );
 }
 
 ///////////// helpers
@@ -234,4 +280,41 @@ function toImgType(fileName: string): string {
     default:
       throw new Error(`Unsupported file type ${ext}`);
   }
+}
+
+export type Result<T, E = Error> =
+  | { ok: true; value: T }
+  | { ok: false; error: E };
+
+export function executeBatch<T>(
+  tasks: (() => Promise<T>)[],
+  batchSize: number = Number.MAX_SAFE_INTEGER,
+  sleepBetweenBatchesMs: number = 0
+): Promise<Result<T>[]> {
+  const batches = [];
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    batches.push(tasks.slice(i, i + batchSize));
+  }
+
+  return batches.reduce(
+    (soFar, currentBatch, currentIndex) =>
+      soFar.then(async (results: Result<T>[]) => {
+        if (currentIndex > 0) await sleep(sleepBetweenBatchesMs);
+        return await Promise.all(
+          currentBatch.map((task) =>
+            task()
+              .then((value): Result<T> => ({ ok: true, value }))
+              .catch((error): Result<T> => ({ ok: false, error }))
+          )
+        ).then(async (batchResults: Result<T>[]) => [
+          ...results,
+          ...batchResults,
+        ]);
+      }),
+    Promise.resolve([] as Result<T>[])
+  );
+}
+
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
